@@ -5,12 +5,10 @@
 
 ggml_log_level def_level = GGML_LOG_LEVEL_WARN;
 
-void log(ggml_log_level level, const char *text)
+void log(ggml_log_level level, const char *text, void * /*user data*/)
 {
     if ((level >= def_level && level != GGML_LOG_LEVEL_CONT) && text != nullptr)
-    {
         printf("%s", text);
-    }
 }
 
 void print_sys_info()
@@ -57,8 +55,7 @@ int main(int argc, char *argv[])
     ggml_backend_load_all();
     print_sys_info();
 
-    llama_log_set([](ggml_log_level level, const char *text, void * /*user_data*/)
-                  { log(level, text); }, NULL);
+    llama_log_set(log, nullptr);
 
     //  Load model
     llama_model_params model_params = llama_model_default_params();
