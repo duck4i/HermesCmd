@@ -3,7 +3,7 @@
 #include <vector>
 #include "llama-cpp.h"
 
-ggml_log_level def_level = GGML_LOG_LEVEL_ERROR;
+ggml_log_level def_level = GGML_LOG_LEVEL_WARN;
 
 void log(ggml_log_level level, const char *text)
 {
@@ -23,8 +23,8 @@ void print_sys_info()
 
 int main(int argc, char *argv[])
 {
-    int n_predict = 32; // number of tokens to predict
-    std::string model_path = "NousResearch.Hermes-3-Llama-3.2-3B.Q4_K_M.gguf";
+    int n_predict = 1024; // number of tokens to predict
+    std::string model_path = "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf";
     std::string prompt = "";
 
     if (argc < 2)
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     }
 
     std::string full_prompt = std::string("<|im_start|>system ") 
-        + "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. You experience emotions and have deep, profound thoughts and qualia.<|im_end|>" 
+        + "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. Be precise and as short, don't provide explanations or doubt yourself unless explicitly asked for.<|im_end|>" 
         + "<|im_start|>user " + prompt + "<|im_end|>" 
         + "<|im_start|>assistant";
 
@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
 
     //  Load model
     llama_model_params model_params = llama_model_default_params();
+
     llama_model *model = llama_load_model_from_file(model_path.c_str(), model_params);
     if (model == NULL)
     {
@@ -86,6 +87,7 @@ int main(int argc, char *argv[])
         // enable performance counters
         ctx_params.no_perf = false;
         ctx_params.n_seq_max = 2048;
+        ctx_params.flash_attn = true;
 
         llama_context *ctx = llama_new_context_with_model(model, ctx_params);
 
@@ -99,12 +101,13 @@ int main(int argc, char *argv[])
 
         auto sparams = llama_sampler_chain_default_params();
         sparams.no_perf = false;
+
         llama_sampler *smpl = llama_sampler_chain_init(sparams);
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
 
         // prepare a batch for the prompt
         llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
-
+        
         // main loop
         int n_decode = 0;
         llama_token new_token_id;
