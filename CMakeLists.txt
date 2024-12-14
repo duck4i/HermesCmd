@@ -6,16 +6,18 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include directories for headers
-include_directories(${CMAKE_SOURCE_DIR}/llama)  # Include headers from llama folder
+include_directories(${CMAKE_SOURCE_DIR}/llama/include)  # Include headers from llama folder
 
 # Add subdirectory for ggml
 add_subdirectory(ggml)
 
-# Add executable target for main.cpp
-add_executable(Hermes main.cpp)
+file(GLOB LLAMA_SOURCES "llama/src/*.cpp")
 
-# Link ggml library to the executable (assuming ggml builds a library)
-target_link_libraries(Hermes ggml)  # Replace 'ggml' with the actual target name if different
+# Add executable target for main.cpp
+add_executable(Hermes ${LLAMA_SOURCES} main.cpp)
+
+# Link libraries
+target_link_libraries(Hermes ggml)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
