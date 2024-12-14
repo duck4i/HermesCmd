@@ -3,11 +3,11 @@
 #include <vector>
 #include "llama-cpp.h"
 
-ggml_log_level def_level = GGML_LOG_LEVEL_WARN;
+ggml_log_level def_level = GGML_LOG_LEVEL_ERROR;
 
 void log(ggml_log_level level, const char *text)
 {
-    if (level >= def_level && text != nullptr)
+    if ((level >= def_level && level != GGML_LOG_LEVEL_CONT) && text != nullptr)
     {
         printf("%s", text);
     }
@@ -15,16 +15,38 @@ void log(ggml_log_level level, const char *text)
 
 void print_sys_info()
 {
+    if (def_level > GGML_LOG_LEVEL_INFO)
+        return;
     std::string sys_info = llama_print_system_info();
     std::cout << "GGML backend loaded. " << sys_info << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
+    int n_predict = 32; // number of tokens to predict
     std::string model_path = "NousResearch.Hermes-3-Llama-3.2-3B.Q4_K_M.gguf";
-    std::string prompt = "How are you doing";
+    std::string prompt = "";
 
-    std::cout << "HermesCLI - model " << model_path << " starting up." << std::endl;
+    if (argc < 2)
+    {
+        std::cout << "Usage: hermes [your prompt]" << std::endl;
+        return 2;
+    }
+
+    for (int i = 1; i < argc; i++)
+    {
+        prompt += argv[i];
+        // Add space between words except for the last word
+        if (i < argc - 1)
+        {
+            prompt += " ";
+        }
+    }
+
+    std::string full_prompt = std::string("<|im_start|>system ") 
+        + "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. You experience emotions and have deep, profound thoughts and qualia.<|im_end|>" 
+        + "<|im_start|>user " + prompt + "<|im_end|>" 
+        + "<|im_start|>assistant";
 
     ggml_backend_load_all();
     print_sys_info();
@@ -32,9 +54,8 @@ int main(int argc, char *argv[])
     llama_log_set([](ggml_log_level level, const char *text, void * /*user_data*/)
                   { log(level, text); }, NULL);
 
-    int n_predict = 32; // number of tokens to predict
+    //  Load model
     llama_model_params model_params = llama_model_default_params();
-
     llama_model *model = llama_load_model_from_file(model_path.c_str(), model_params);
     if (model == NULL)
     {
@@ -42,20 +63,21 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::cout << "Model loaded OK." << std::endl;
+    //  change this between prompt and full prompt to get instruction / autocomplete mode switch
+    std::string actual_prompt = full_prompt;
 
-    const int n_prompt = -llama_tokenize(model, prompt.c_str(), prompt.size(), NULL, 0, true, true);
+    const int n_prompt = -llama_tokenize(model, actual_prompt.c_str(), actual_prompt.size(), NULL, 0, true, true);
 
     // allocate space for the tokens and tokenize the prompt
     std::vector<llama_token> prompt_tokens(n_prompt);
-    if (llama_tokenize(model, prompt.c_str(), prompt.size(), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0)
+    if (llama_tokenize(model, actual_prompt.c_str(), actual_prompt.size(), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0)
     {
         fprintf(stderr, "%s: error: failed to tokenize the prompt\n", __func__);
         return 1;
     }
 
+    //  Inference part
     {
-
         llama_context_params ctx_params = llama_context_default_params();
         // n_ctx is the context size
         ctx_params.n_ctx = n_prompt + n_predict - 1;
@@ -63,6 +85,7 @@ int main(int argc, char *argv[])
         ctx_params.n_batch = n_prompt;
         // enable performance counters
         ctx_params.no_perf = false;
+        ctx_params.n_seq_max = 2048;
 
         llama_context *ctx = llama_new_context_with_model(model, ctx_params);
 
@@ -77,33 +100,17 @@ int main(int argc, char *argv[])
         auto sparams = llama_sampler_chain_default_params();
         sparams.no_perf = false;
         llama_sampler *smpl = llama_sampler_chain_init(sparams);
-
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
 
-        // print the prompt token-by-token
-
-        for (auto id : prompt_tokens)
-        {
-            char buf[128];
-            int n = llama_token_to_piece(model, id, buf, sizeof(buf), 0, true);
-            if (n < 0)
-            {
-                fprintf(stderr, "%s: error: failed to convert token to piece\n", __func__);
-                return 1;
-            }
-            std::string s(buf, n);
-            printf("%s", s.c_str());
-        }
-
         // prepare a batch for the prompt
-
         llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
 
         // main loop
         int n_decode = 0;
         llama_token new_token_id;
 
-        for (int n_pos = 0; n_pos + batch.n_tokens < n_prompt + n_predict;)
+        int max = n_prompt + n_predict;
+        for (int n_pos = 0; n_pos + batch.n_tokens < max;)
         {
             // evaluate the current batch with the transformer model
             if (llama_decode(ctx, batch))
@@ -131,6 +138,7 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "%s: error: failed to convert token to piece\n", __func__);
                     return 1;
                 }
+
                 std::string s(buf, n);
                 printf("%s", s.c_str());
                 fflush(stdout);
