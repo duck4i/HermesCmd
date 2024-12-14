@@ -27,26 +27,32 @@ int main(int argc, char *argv[])
     std::string model_path = "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf";
     std::string prompt = "";
 
+    //  show usage
     if (argc < 2)
     {
         std::cout << "Usage: hermes [your prompt]" << std::endl;
         return 2;
     }
 
+    //  fill the prompt
     for (int i = 1; i < argc; i++)
     {
         prompt += argv[i];
-        // Add space between words except for the last word
         if (i < argc - 1)
         {
             prompt += " ";
         }
     }
 
-    std::string full_prompt = std::string("<|im_start|>system ") 
-        + "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. Be precise and as short, don't provide explanations or doubt yourself unless explicitly asked for.<|im_end|>" 
-        + "<|im_start|>user " + prompt + "<|im_end|>" 
-        + "<|im_start|>assistant";
+    std::string system =
+        "<|im_start|>system "
+        "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. Be precise and as short, don't provide explanations or doubt yourself unless explicitly asked for."
+        "<|im_end|>";
+
+    std::string full_prompt = system + std::string("<|im_start|>user ") + prompt + "<|im_end|>" + "<|im_start|>assistant";
+
+    //  change this between prompt and full prompt to get instruction / autocomplete mode switch
+    std::string actual_prompt = full_prompt;
 
     ggml_backend_load_all();
     print_sys_info();
@@ -63,9 +69,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s: error: unable to load model\n", __func__);
         return 1;
     }
-
-    //  change this between prompt and full prompt to get instruction / autocomplete mode switch
-    std::string actual_prompt = full_prompt;
 
     const int n_prompt = -llama_tokenize(model, actual_prompt.c_str(), actual_prompt.size(), NULL, 0, true, true);
 
@@ -102,7 +105,7 @@ int main(int argc, char *argv[])
 
         // prepare a batch for the prompt
         llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
-        
+
         // main loop
         int n_decode = 0;
         llama_token new_token_id;
