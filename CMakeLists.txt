@@ -11,14 +11,13 @@ include_directories(${CMAKE_SOURCE_DIR}/llama/include)  # Include headers from l
 
 # Add subdirectory for ggml
 add_subdirectory(ggml)
-
-file(GLOB LLAMA_SOURCES "llama/src/*.cpp")
+add_subdirectory(llama/src)
 
 # Add executable target for main.cpp
-add_executable(hermes ${LLAMA_SOURCES} main.cpp)
+add_executable(hermes main.cpp)
 
 # Link libraries
-target_link_libraries(hermes ggml)
+target_link_libraries(hermes ggml llama)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
