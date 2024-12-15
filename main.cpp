@@ -2,45 +2,47 @@
 #include <string>
 #include <vector>
 #include "llama-cpp.h"
+#include "popl.hpp"
 
-ggml_log_level def_level = GGML_LOG_LEVEL_WARN;
+using namespace popl;
 
-void log(ggml_log_level level, const char *text, void * /*user data*/)
+void log(ggml_log_level level, const char *text, void* data)
 {
-    if ((level >= def_level && level != GGML_LOG_LEVEL_CONT) && text != nullptr)
+    int specified_level = *(static_cast<int*>(data));
+    if ((level >= specified_level && level != GGML_LOG_LEVEL_CONT) && text != nullptr)
         printf("%s", text);
-}
-
-void print_sys_info()
-{
-    if (def_level > GGML_LOG_LEVEL_INFO)
-        return;
-    std::string sys_info = llama_print_system_info();
-    std::cout << "GGML backend loaded. " << sys_info << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
-    int n_predict = 1024; // number of tokens to predict
-    std::string model_path = "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf";
-    std::string prompt = "";
+    int n_log;
+    int n_predict; // number of tokens to predict
 
-    //  show usage
-    if (argc < 2)
+    OptionParser parser("Allowed options");
+    auto help_option = parser.add<Switch>("h", "help", "Produce help message.");
+    auto print_system_info = parser.add<Switch>("s", "sys_info", "Prints build system info.");
+    auto instruct_option = parser.add<Switch>("i", "instruct", "If enabled the LLM will add a system prompt and answer your questions, otherwise it will default to autocomplete.");
+    auto max_token_option = parser.add<Value<int>>("t", "tokens", "Max token count for output (lenght of response).", 1024, &n_predict);
+    auto log_option = parser.add<Value<int>>("l", "log", "Log level. 0 - none, 1 - debug, 2 - info, 3 - warn, 4 - error", (int) GGML_LOG_LEVEL_WARN, &n_log);
+    auto prompt_option = parser.add<Value<std::string>>("p", "prompt", "Your actual prompt for LLM (please use quotes).");
+    auto model_option = parser.add<Value<std::string>>("m", "model", "Filename of model to load.", "Hermes-3-Llama-3.2-3B.Q6_K.gguf");
+    parser.parse(argc, argv);
+
+    bool prompt_is_set = prompt_option.get()->is_set();
+
+    if (print_system_info.get()->is_set())
     {
-        std::cout << "Usage: hermes [your prompt]" << std::endl;
-        return 2;
+        std::cout << llama_print_system_info() << std::endl;
+        return prompt_is_set ? 0 : 1;
     }
 
-    //  fill the prompt
-    for (int i = 1; i < argc; i++)
+    if (help_option.get()->is_set() || !prompt_is_set)
     {
-        prompt += argv[i];
-        if (i < argc - 1)
-        {
-            prompt += " ";
-        }
+        std::cout << parser << std::endl;
+        return prompt_is_set ? 0 : 1;
     }
+
+    auto prompt = prompt_option.get()->value();
 
     std::string system =
         "<|im_start|>system "
@@ -48,19 +50,15 @@ int main(int argc, char *argv[])
         "<|im_end|>";
 
     std::string full_prompt = system + std::string("<|im_start|>user ") + prompt + "<|im_end|>" + "<|im_start|>assistant";
-
-    //  change this between prompt and full prompt to get instruction / autocomplete mode switch
-    std::string actual_prompt = full_prompt;
+    std::string actual_prompt = instruct_option.get()->is_set() ? full_prompt : prompt;
 
     ggml_backend_load_all();
-    print_sys_info();
-
-    llama_log_set(log, nullptr);
+    llama_log_set(log, (void*)&n_log);
 
     //  Load model
     llama_model_params model_params = llama_model_default_params();
 
-    llama_model *model = llama_load_model_from_file(model_path.c_str(), model_params);
+    llama_model *model = llama_load_model_from_file(model_option.get()->value().c_str(), model_params);
     if (model == NULL)
     {
         fprintf(stderr, "%s: error: unable to load model\n", __func__);
