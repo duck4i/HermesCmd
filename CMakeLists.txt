@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include directories for headers
 include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${CMAKE_SOURCE_DIR}/llama/include)  # Include headers from llama folder
 
 # Add subdirectory for ggml
 add_subdirectory(ggml)
