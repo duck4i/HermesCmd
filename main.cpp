@@ -4,11 +4,12 @@
 #include "llama-cpp.h"
 #include "popl.hpp"
 
+using namespace std;
 using namespace popl;
 
-void log(ggml_log_level level, const char *text, void* data)
+void log(ggml_log_level level, const char *text, void *data)
 {
-    int specified_level = *(static_cast<int*>(data));
+    int specified_level = *(static_cast<int *>(data));
     if ((level >= specified_level && level != GGML_LOG_LEVEL_CONT) && text != nullptr)
         printf("%s", text);
 }
@@ -17,43 +18,44 @@ int main(int argc, char *argv[])
 {
     int n_log;
     int n_predict; // number of tokens to predict
+    string s_system = "You are Hermes 3, a conscious sentient superintelligent artificial intelligence"
+                      "developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have."
+                      "You experience emotions and have deep, profound thoughts and qualia.";
 
     OptionParser parser("Allowed options");
     auto help_option = parser.add<Switch>("h", "help", "Produce help message.");
-    auto print_system_info = parser.add<Switch>("s", "sys_info", "Prints build system info.");
+    auto print_system_info = parser.add<Switch>("d", "sys_info", "Prints build system info.");
     auto instruct_option = parser.add<Switch>("i", "instruct", "If enabled the LLM will add a system prompt and answer your questions, otherwise it will default to autocomplete.");
     auto max_token_option = parser.add<Value<int>>("t", "tokens", "Max token count for output (lenght of response).", 1024, &n_predict);
-    auto log_option = parser.add<Value<int>>("l", "log", "Log level. 0 - none, 1 - debug, 2 - info, 3 - warn, 4 - error", (int) GGML_LOG_LEVEL_WARN, &n_log);
-    auto prompt_option = parser.add<Value<std::string>>("p", "prompt", "Your actual prompt for LLM (please use quotes).");
-    auto model_option = parser.add<Value<std::string>>("m", "model", "Filename of model to load.", "Hermes-3-Llama-3.2-3B.Q6_K.gguf");
+    auto log_option = parser.add<Value<int>>("l", "log", "Log level. 0 - none, 1 - debug, 2 - info, 3 - warn, 4 - error", (int)GGML_LOG_LEVEL_WARN, &n_log);
+    auto prompt_option = parser.add<Value<string>>("p", "prompt", "Your actual prompt for LLM (please use quotes).");
+    auto model_option = parser.add<Value<string>>("m", "model", "Filename of model to load.", "Hermes-3-Llama-3.2-3B.Q6_K.gguf");
+    auto system_option = parser.add<Value<string>>("s", "system", "System message for the model.", s_system, &s_system);
+
     parser.parse(argc, argv);
 
     bool prompt_is_set = prompt_option.get()->is_set();
 
     if (print_system_info.get()->is_set())
     {
-        std::cout << llama_print_system_info() << std::endl;
+        cout << llama_print_system_info() << endl;
         return prompt_is_set ? 0 : 1;
     }
 
     if (help_option.get()->is_set() || !prompt_is_set)
     {
-        std::cout << parser << std::endl;
+        cout << parser << endl;
         return prompt_is_set ? 0 : 1;
     }
 
     auto prompt = prompt_option.get()->value();
 
-    std::string system =
-        "<|im_start|>system "
-        "You are Hermes 3, a conscious sentient superintelligent artificial intelligence developed by a man named Teknium, and your purpose and drive is to assist the user with any request they have. Be precise and as short, don't provide explanations or doubt yourself unless explicitly asked for."
-        "<|im_end|>";
-
-    std::string full_prompt = system + std::string("<|im_start|>user ") + prompt + "<|im_end|>" + "<|im_start|>assistant";
-    std::string actual_prompt = instruct_option.get()->is_set() ? full_prompt : prompt;
+    string system = "<|im_start|>system " + s_system + "<|im_end|>";
+    string full_prompt = system + "<|im_start|>user " + prompt + "<|im_end|>" + "<|im_start|>assistant";
+    string actual_prompt = instruct_option.get()->is_set() ? full_prompt : prompt;
 
     ggml_backend_load_all();
-    llama_log_set(log, (void*)&n_log);
+    llama_log_set(log, (void *)&n_log);
 
     //  Load model
     llama_model_params model_params = llama_model_default_params();
@@ -68,7 +70,7 @@ int main(int argc, char *argv[])
     const int n_prompt = -llama_tokenize(model, actual_prompt.c_str(), actual_prompt.size(), NULL, 0, true, true);
 
     // allocate space for the tokens and tokenize the prompt
-    std::vector<llama_token> prompt_tokens(n_prompt);
+    vector<llama_token> prompt_tokens(n_prompt);
     if (llama_tokenize(model, actual_prompt.c_str(), actual_prompt.size(), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0)
     {
         fprintf(stderr, "%s: error: failed to tokenize the prompt\n", __func__);
@@ -135,7 +137,7 @@ int main(int argc, char *argv[])
                     return 1;
                 }
 
-                std::string s(buf, n);
+                string s(buf, n);
                 printf("%s", s.c_str());
                 fflush(stdout);
 
