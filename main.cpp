@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     auto log_option = parser.add<Value<int>>("l", "log", "Log level. 0 - none, 1 - debug, 2 - info, 3 - warn, 4 - error", (int)GGML_LOG_LEVEL_WARN, &n_log);
     auto prompt_option = parser.add<Value<string>>("p", "prompt", "Your actual prompt for LLM (please use quotes).");
     auto model_option = parser.add<Value<string>>("m", "model", "Filename of model to load.", "Hermes-3-Llama-3.2-3B.Q6_K.gguf");
-    auto system_option = parser.add<Value<std::string>>("s", "system", "System message for the model.", s_system, &s_system);
+    auto system_option = parser.add<Value<string>>("s", "system", "System message for the model.", s_system, &s_system);
 
     parser.parse(argc, argv);
 
